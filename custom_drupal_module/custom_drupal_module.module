@@ -1,0 +1,184 @@
+<?php
+
+/**
+ * Implements hook_menu().
+ */
+function custom_drupal_module_menu() {
+    $items['custom-page'] = [
+      'title' => 'Custom page',
+      'page callback' => 'custom_drupal_module_page',
+      'access callback' => 'custom_drupal_module_access_callback',
+      'access arguments' => ['show custom page'],
+    ];
+
+    return $items;
+}
+
+/**
+ * Check role.
+ */
+function custom_drupal_module_access_callback($role_name) {
+    if ($role = user_role_load_by_name($role_name)) {
+        return user_has_role($role->rid);
+    }
+
+    return FALSE;
+}
+
+function custom_drupal_module_form($form, &$form_state, $i) {
+    $form['#num'] = $i;
+    
+    $form['type'] = [
+      '#title' => t('Node title field type'),
+      '#type' => 'radios',
+      '#options' => ['select' => t('Select'), 'textfield' => t('Textfield')],
+      '#required' => TRUE,
+      '#weight' => 0,
+      '#ajax' => [
+        'method' => 'replace',
+        'callback' => 'type_form_state_ajax_callback',
+        'wrapper' => 'checkboxes-div-' . $i
+      ],
+    ];
+
+    if (isset($form_state['values']['type'])) {
+        switch ($form_state['values']['type']) {
+            case 'select':
+                $form['title'] = [
+                  '#prefix' => '<div id="checkboxes-div-' . $form['#num'] . '">',
+                  '#suffix' => '</div>',
+                  '#type' => 'select',
+                  '#options' => [
+                    'First node title' => 'First node title',
+                    'Second node title' => 'Second node title',
+                    'Third node title' => 'Third node title'
+                  ],
+                  '#required' => TRUE,
+                ];
+                break;
+            case 'textfield':
+                $form['title'] = [
+                  '#prefix' => '<div id="checkboxes-div-' . $form['#num'] . '">',
+                  '#suffix' => '</div>',
+                  '#title' => t('Node title'),
+                  '#type' => 'textfield',
+                  '#required' => TRUE,
+                  '#maxlength' => 128,
+                  '#size' => 64,
+                  '#weight' => 1
+                ];
+                break;
+        }
+    } else {
+        $form['title'] = [
+          '#weight' => 1,
+          '#prefix' => '<div id="checkboxes-div-' . $i . '">',
+          '#suffix' => '</div>',
+          '#required' => TRUE,
+        ];
+    }
+
+    $form['wrapper'] = [
+      '#weight' => 9,
+      "#markup" => '<div id="custom-ajax-' . $i . '"></div>'
+    ];
+    
+    $form['submit'] = [
+      '#type' => 'submit',
+      '#validate' => ['custom_drupal_module_ajax_form_validate'],
+      '#submit' => ['custom_drupal_module_ajax_form_submit'],
+      '#weight' => 10,
+      '#value' => t('Submit'),
+      '#ajax' => [
+        'callback' => 'custom_drupal_module_ajax_submit_callback',
+        'wrapper' => 'custom-ajax-' . $i,
+      ],
+    ];
+    
+    return $form;
+}
+
+function custom_drupal_module_forms($form_id, $args) {
+    $forms = [];
+    if (!empty($args) && $form_id == 'custom_drupal_module_form_' . $args[0]) {
+        $forms[$form_id]['callback'] = 'custom_drupal_module_form';
+    }
+    return $forms;
+}
+
+function custom_drupal_module_page() {
+    for ($i = 0; $i < 3; $i++) {
+        $build[$i] = drupal_get_form('custom_drupal_module_form_' . $i, $i);
+    }
+
+    return $build;
+}
+
+function type_form_state_ajax_callback($form, &$form_state) {
+    return $form['title'];
+}
+
+/**
+ * Form validation
+ */
+function custom_drupal_module_ajax_form_validate($form, &$form_state) {
+    //do the validations here
+    if (!empty($form_state['values']['title'])) {
+        return TRUE;
+    } else {
+        form_set_error('error', t('Please select a title'));
+    }
+}
+
+/**
+ * Form submit
+ */
+function custom_drupal_module_ajax_form_submit($form, &$form_state) {
+    if (isset($form_state['nid'])) {
+        $nid = custom_drupal_module_update_node($form_state);
+        drupal_set_message(t("Node with {$nid} was UPDATED."));
+    } else {
+        $nid = custom_drupal_module_add_node($form_state);
+        $form_state['nid'] = $nid;
+        drupal_set_message(t("Node with {$nid} was CREATED."));
+    }
+
+
+    $form_state['input'] = []; //remove user inputted values from form fields
+    $form_state['rebuild'] = TRUE; //rebuild form
+}
+
+function custom_drupal_module_ajax_submit_callback($form, &$form_state) {
+    return ["#markup" => '<div id="custom-ajax-' . $form['#num'] . '"></div>'];
+}
+
+
+/**
+ * Create node
+ */
+function custom_drupal_module_add_node(&$form_state) {
+    global $user;
+    $node = new stdClass();
+    $node->language = LANGUAGE_NONE;
+    $node->title = $form_state['values']['title'];
+    $node->type = $form_state['values']['type'];
+    node_object_prepare($node);
+    $node->uid = $user->uid;
+    $node->status = 1;
+    $node = node_submit($node);
+    node_save($node);
+    return $node->nid;
+}
+
+/**
+ * Update node
+ */
+function custom_drupal_module_update_node(&$form_state) {
+    global $user;
+    $node = node_load($form_state['nid']);
+    $node->title = $form_state['values']['title'];
+    node_save($node);
+    return $form_state['nid'];
+}
+
+
