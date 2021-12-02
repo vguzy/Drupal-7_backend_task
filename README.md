@@ -30,8 +30,11 @@ Type - will be variable according value set in first field
 This field is required.
 
 In case this field is type of Select, it will have there 3 values:
+
 ● First node title
+
 ● Second node title
+
 ● Third node title
 
 Third field
