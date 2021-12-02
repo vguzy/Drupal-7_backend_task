@@ -40,7 +40,9 @@ In case this field is type of Select, it will have there 3 values:
 Third field
 
 Type - submit
+
 Value - Submit
+
 This is the submit button. It will submit the form via AJAX. Result message will appear over the button.
 (error message when required field is not set, or success message if submit was successful).
 
